@@ -1,7 +1,7 @@
 {
 	"InstallScripts" : 
 	[
-		"D:/c++/MyFind-VerteilteSysteme/src/cmake-build-debug/cmake_install.cmake"
+		"D:/c++/MyFind-VerteilteSysteme/cmake-build-debug/cmake_install.cmake"
 	],
 	"Parallel" : false
 }
