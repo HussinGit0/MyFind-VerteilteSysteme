@@ -8,6 +8,8 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include <filesystem>
+#include <dirent.h>
 
 using namespace std;
 
@@ -95,4 +97,25 @@ int main(int argc, char *argv[])
         cout << "  " << filenames[i] << "\n";
     }
     //////////////////////////////////////////////////
+
+    // Testing directory reading:
+    DIR *dirp;
+    if ((dirp = opendir(searchPath.c_str())) == NULL)
+    {
+        cerr << "Error: Cannot open directory " << searchPath << "\n";
+        return 1;
+    }
+
+    // Testing file reading
+    struct dirent *direntp;
+    while ((direntp = readdir(dirp)) != NULL)
+    {
+        if (direntp->d_name[0] == '.') // skip files with . at the start (e.g.: . and ..)
+            continue;
+
+        if (direntp->d_name == filenames[0]) // only checks for the first file in the list atm
+            cout << "File found: ";
+
+        cout << direntp->d_name << "\n";
+    }
 }
