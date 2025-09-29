@@ -1,4 +1,9 @@
-cmake_minimum_required(VERSION 4.0)
+# Prüfe, ob unter Linux gebaut wird
+if(NOT (UNIX AND NOT APPLE))
+    message(FATAL_ERROR "Dieses Projekt kann nur unter Linux (WSL) gebaut werden.")
+endif()
+
+cmake_minimum_required(VERSION 3.0.0)
 project(MyFind)
 
 set(CMAKE_CXX_STANDARD 20)
