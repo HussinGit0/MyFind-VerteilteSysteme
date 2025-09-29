@@ -11,14 +11,9 @@
 #include <filesystem>
 #include <dirent.h>
 #include <stdexcept>
+#include "Options.h"
 
 using namespace std;
-
-struct Options
-{
-    unsigned short Counter_Option_R = 0;
-    unsigned short Counter_Option_i = 0;
-};
 
 // unsigned short Counter_Option_R = 0;
 // unsigned short Counter_Option_i = 0;

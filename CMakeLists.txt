@@ -8,4 +8,7 @@ project(MyFind)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(MyFind src/main.cpp)
+add_executable(MyFind src/main.cpp
+    src/Options.cpp)
+
+
