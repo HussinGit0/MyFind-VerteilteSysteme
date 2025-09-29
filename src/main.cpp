@@ -10,60 +10,70 @@
 #include <vector>
 #include <filesystem>
 #include <dirent.h>
+#include <stdexcept>
 
 using namespace std;
 
-unsigned short Counter_Option_R = 0;
-unsigned short Counter_Option_i = 0;
+struct Options
+{
+    unsigned short Counter_Option_R = 0;
+    unsigned short Counter_Option_i = 0;
+};
+
+// unsigned short Counter_Option_R = 0;
+// unsigned short Counter_Option_i = 0;
 
 /// @brief Parses command line options.
 /// @param argc
 /// @param argv
 /// @param Counter_Option_R recursive flag
 /// @param Counter_Option_i case insensitive flag
-/// @return 0 if successful, 1 if error occured.
-int parseOptions(int argc, char *argv[], unsigned short &Counter_Option_R, unsigned short &Counter_Option_i)
+/// @return
+Options parseOptions(int argc, char *argv[])
 {
+    struct Options options;
     int c;
     while ((c = getopt(argc, argv, "Ri")) != EOF)
     {
         switch (c)
         {
         case 'R':
-            Counter_Option_R++;
+            options.Counter_Option_R++;
             break;
         case 'i':
-            Counter_Option_i++;
+            options.Counter_Option_i++;
             break;
         default:
-            return 1;
+            throw invalid_argument("Invalid arguments provided.");
             break;
         }
     }
 
-    return 0;
+    if ((options.Counter_Option_i > 1) || (options.Counter_Option_R > 1))
+    {
+        cerr << "Error: Duplicate options detected." << endl;
+        throw invalid_argument("Options must be provided at most once.");
+    }
+
+    return options;
 }
 
 int main(int argc, char *argv[])
 {
-    int result = parseOptions(argc, argv, Counter_Option_R, Counter_Option_i);
-
-    // Arguement error handling
-    if (result != 0)
+    Options options;
+    try
     {
-        cerr << "Error: Invalid options provided." << endl;
-        return 1;
+        options = parseOptions(argc, argv);
     }
-
-    if ((Counter_Option_i > 1) || (Counter_Option_R > 1))
+    catch (const invalid_argument &e)
     {
-        cerr << "Error: Duplicate options detected." << endl;
+        cout << "Error: " << e.what() << endl;
         return 1;
     }
 
     if (optind >= argc)
     {
-        cerr << "Error: No input file provided." << endl;
+        cout << "Error: No input file provided." << endl;
         return 1;
     }
 
@@ -74,7 +84,7 @@ int main(int argc, char *argv[])
     // If no file names are provided, return error
     if (optind >= argc)
     {
-        cerr << "Error: at least one filename is required!\n";
+        cout << "Error: at least one filename is required!\n";
         return 1;
     }
 
@@ -86,8 +96,8 @@ int main(int argc, char *argv[])
     }
 
     // just making sure everything is working. Remove later:
-    cout << "Option i:" << Counter_Option_i << "\n";
-    cout << "Option r:" << Counter_Option_R << "\n";
+    cout << "Option i:" << options.Counter_Option_i << "\n";
+    cout << "Option r:" << options.Counter_Option_R << "\n";
 
     cout << "Search path: " << searchPath << "\n";
 
