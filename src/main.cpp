@@ -86,7 +86,6 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
     {
         if (options.Counter_Option_R == 1)
         {
-            cout << "Recursive \n";
             for (const auto &entry : filesystem::recursive_directory_iterator(path))
             {
                 if (entry.is_regular_file() &&
