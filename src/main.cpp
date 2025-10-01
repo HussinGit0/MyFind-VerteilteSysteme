@@ -1,9 +1,9 @@
 /**
  * getopt: (https://stackoverflow.com/questions/52467531/using-getopt-in-c-to-handle-arguments)
  * compile: g++ main.cpp -o myfind
- * run: ./myfind -i -R /path/to/dir file1 file2 file3
- */
-
+ * run: Go to /build and use the command: ./MyFind -i -R /path/to/dir file1 file2 file3
+ * ./MyFind -i -R ~/projects file1 file2 file3
+ **/
 #include <iostream>
 #include <string>
 #include <unistd.h>
@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <stdexcept>
 #include "Options.h"
+#include "SearchResult.h"
 
 using namespace std;
 
@@ -53,6 +54,53 @@ Options parseOptions(int argc, char *argv[])
     return options;
 }
 
+vector<SearchResult> SearchFile(string &path, string filename, Options options)
+{
+    vector<SearchResult> results;
+    pid_t pid = getpid();
+
+    try
+    {
+        if (options.Counter_Option_R == 1)
+        {
+            cout << "Recursive \n";
+            for (const auto &entry : filesystem::recursive_directory_iterator(path))
+            {
+                if (entry.is_regular_file() && entry.path().filename() == filename)
+                {
+                    SearchResult result;
+                    result.pid = pid;
+                    result.filename = filename;
+                    result.path = entry.path();
+
+                    results.push_back(result);
+                }
+            }
+        }
+        else
+        {
+            for (const auto &entry : filesystem::directory_iterator(path))
+            {
+                if (entry.is_regular_file() && entry.path().filename() == filename)
+                {
+                    SearchResult result;
+                    result.pid = pid;
+                    result.filename = filename;
+                    result.path = entry.path();
+
+                    results.push_back(result);
+                }
+            }
+        }
+    }
+    catch (const filesystem::filesystem_error &e)
+    {
+        cout << "Oops!";
+    }
+
+    return results;
+}
+
 int main(int argc, char *argv[])
 {
     Options options;
@@ -83,25 +131,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // getopt() on C++ does not support strings, so vectors are used.
     vector<string> filenames;
     for (int i = optind; i < argc; i++)
     {
         filenames.push_back(argv[i]);
     }
-
-    // just making sure everything is working. Remove later:
-    cout << "Option i:" << options.Counter_Option_i << "\n";
-    cout << "Option r:" << options.Counter_Option_R << "\n";
-
-    cout << "Search path: " << searchPath << "\n";
-
-    cout << "Files:\n";
-    for (size_t i = 0; i < filenames.size(); i++)
-    {
-        cout << "  " << filenames[i] << "\n";
-    }
-    //////////////////////////////////////////////////
 
     // Testing directory reading:
     DIR *dirp;
@@ -111,16 +145,24 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Testing file reading
-    struct dirent *direntp;
-    while ((direntp = readdir(dirp)) != NULL)
+    /// SEARCH
+    vector<SearchResult> results;
+    try
     {
-        if (direntp->d_name[0] == '.') // skip files with . at the start (e.g.: . and ..)
-            continue;
-
-        if (direntp->d_name == filenames[0]) // only checks for the first file in the list atm
-            cout << "File found: ";
-
-        cout << direntp->d_name << "\n";
+        results = SearchFile(searchPath, filenames[0], options);
     }
+    catch (filesystem::filesystem_error &e)
+    {
+        cout << "Oops";
+        return 1;
+    }
+
+    /// OUTPUT SEARCH
+    for (const auto &result : results)
+    {
+        cout << "pid: " << result.pid << " . file name: " << result.filename << " . path: " << result.path << "\n";
+    }
+
+    cout << "terminating program.\n";
+    return 0;
 }
