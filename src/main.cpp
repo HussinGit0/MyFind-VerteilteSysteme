@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <dirent.h>
 #include <stdexcept>
+#include <sys/wait.h>
+#include <cstring>
 #include "Options.h"
 #include "SearchResult.h"
 
@@ -144,21 +146,131 @@ int main(int argc, char *argv[])
         cerr << "Error: Cannot open directory " << searchPath << "\n";
         return 1;
     }
+    closedir(dirp);
 
-    /// SEARCH
-    vector<SearchResult> results;
-    try
+    /// FORK AND SEARCH FOR EACH FILE
+    vector<SearchResult> allResults;
+    vector<pid_t> childPids;
+    vector<int> readPipes;
+
+    // Erstelle für jede Datei einen Child-Prozess mit fork()
+    for (const string &filename : filenames)
     {
-        results = SearchFile(searchPath, filenames[0], options);
-    }
-    catch (filesystem::filesystem_error &e)
-    {
-        cout << "Oops";
-        return 1;
+        int pipefd[2];
+        if (pipe(pipefd) == -1)
+        {
+            cerr << "Error creating pipe for file: " << filename << endl;
+            continue;
+        }
+
+        pid_t pid = fork();
+        if (pid == -1)
+        {
+            cerr << "Error forking process for file: " << filename << endl;
+            close(pipefd[0]);
+            close(pipefd[1]);
+            continue;
+        }
+
+        if (pid == 0)
+        {
+            // Child-Prozess: Führe SearchFile aus und sende Ergebnisse über Pipe
+            close(pipefd[0]); // Schließe Read-End in Child
+
+            try
+            {
+                vector<SearchResult> results = SearchFile(searchPath, filename, options);
+
+                // Schreibe Anzahl der Ergebnisse zuerst
+                size_t numResults = results.size();
+                write(pipefd[1], &numResults, sizeof(numResults));
+
+                // Schreibe jedes SearchResult direkt in die Pipe
+                for (const SearchResult &result : results)
+                {
+                    // Schreibe pid
+                    write(pipefd[1], &result.pid, sizeof(result.pid));
+
+                    // Schreibe filename length und filename
+                    size_t filenameLen = result.filename.length();
+                    write(pipefd[1], &filenameLen, sizeof(filenameLen));
+                    write(pipefd[1], result.filename.c_str(), filenameLen);
+
+                    // Schreibe path length und path
+                    size_t pathLen = result.path.length();
+                    write(pipefd[1], &pathLen, sizeof(pathLen));
+                    write(pipefd[1], result.path.c_str(), pathLen);
+                }
+
+                close(pipefd[1]);
+                exit(0);
+            }
+            catch (const exception &e)
+            {
+                cerr << "Child process error for file " << filename << ": " << e.what() << endl;
+                close(pipefd[1]);
+                exit(1);
+            }
+        }
+        else
+        {
+            // Parent-Prozess: Speichere PID und Read-Pipe für später
+            close(pipefd[1]); // Schließe Write-End in Parent
+            childPids.push_back(pid);
+            readPipes.push_back(pipefd[0]);
+        }
     }
 
-    /// OUTPUT SEARCH
-    for (const auto &result : results)
+    // Parent-Prozess: Lese Ergebnisse von allen Pipes
+    for (int readPipe : readPipes)
+    {
+        size_t numResults;
+        if (read(readPipe, &numResults, sizeof(numResults)) == sizeof(numResults))
+        {
+            for (size_t i = 0; i < numResults; i++)
+            {
+                SearchResult result;
+
+                // Lese pid
+                read(readPipe, &result.pid, sizeof(result.pid));
+
+                // Lese filename
+                size_t filenameLen;
+                read(readPipe, &filenameLen, sizeof(filenameLen));
+                char *filenameBuffer = new char[filenameLen + 1];
+                read(readPipe, filenameBuffer, filenameLen);
+                filenameBuffer[filenameLen] = '\0';
+                result.filename = string(filenameBuffer);
+                delete[] filenameBuffer;
+
+                // Lese path
+                size_t pathLen;
+                read(readPipe, &pathLen, sizeof(pathLen));
+                char *pathBuffer = new char[pathLen + 1];
+                read(readPipe, pathBuffer, pathLen);
+                pathBuffer[pathLen] = '\0';
+                result.path = string(pathBuffer);
+                delete[] pathBuffer;
+
+                allResults.push_back(result);
+            }
+        }
+        close(readPipe);
+    }
+
+    // Warte auf alle Child-Prozesse
+    for (pid_t childPid : childPids)
+    {
+        int status;
+        waitpid(childPid, &status, 0);
+        if (WEXITSTATUS(status) != 0)
+        {
+            cerr << "Child process " << childPid << " exited with error" << endl;
+        }
+    }
+
+    /// OUTPUT SEARCH RESULTS
+    for (const auto &result : allResults)
     {
         cout << "pid: " << result.pid << " . file name: " << result.filename << " . path: " << result.path << "\n";
     }
