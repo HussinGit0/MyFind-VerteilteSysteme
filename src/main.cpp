@@ -12,10 +12,7 @@
 #include <dirent.h>
 #include <stdexcept>
 #include "Options.h"
-<<<<<<< HEAD
-=======
 #include "SearchResult.h"
->>>>>>> 0699c470143cb0d0a9d894d26974f9b0bae27a54
 
 using namespace std;
 
