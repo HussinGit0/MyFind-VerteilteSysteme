@@ -122,7 +122,7 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
             {
                 // Save the aggregate result in the results vector:
                 // https://en.cppreference.com/w/cpp/language/aggregate_initialization.html
-                results.push_back({pid, filename, entry.path()});
+                results.push_back({pid, entry.path().filename(), entry.path()});
             }
         }
     }
