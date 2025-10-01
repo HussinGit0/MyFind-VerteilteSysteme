@@ -18,6 +18,8 @@
 #include "SearchResult.h"
 #include <algorithm>
 #include <cctype>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 using namespace std;
 using namespace filesystem;
@@ -191,6 +193,8 @@ int main(int argc, char *argv[])
 
     // Vector to store all pipes.
     vector<int> pipes_read;
+    // Vector to store all child processes.
+    vector<pid_t> children;
 
     for (const auto &filename : filenames)
     {
@@ -213,7 +217,9 @@ int main(int argc, char *argv[])
         {
             close(fd[1]);                // Close the write operations because the parent doesn't need it.
             pipes_read.push_back(fd[0]); // Store the read pipe.
+            children.push_back(c_pid);   // Store the child process.
         }
+
         else // This is a child process
         {
             close(fd[0]); // Close the read operations because the children don't need it.
@@ -252,6 +258,19 @@ int main(int argc, char *argv[])
             outputs.push_back(string(buffer));
         }
         close(fd); // Close the pipe after reading.
+    }
+
+    // https://stackoverflow.com/questions/5278582/checking-the-status-of-a-child-process-in-c
+    int status;
+    for (pid_t pid : children)
+    {
+        // https://linux.die.net/man/2/waitpid
+        waitpid(pid, &status, 0);
+        // In case of error, notify that a child failed to exit safely.
+        if (status != 0)
+        {
+            cout << "Child " << pid << " failed to exit safely.";
+        }
     }
 
     // Write outputs at once.
