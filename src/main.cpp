@@ -132,10 +132,10 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
     return results;
 }
 
-/// @brief Covnerts a search results.
+/// @brief Covnerts a SearchResult vector to a string.
 /// @param results
 /// @return A string representing a vector of SearchResults.
-string SearchResultToString(const vector<SearchResult> &results)
+string SearchResultsToString(const vector<SearchResult> &results)
 {
     string output;
     for (const auto &result : results)
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
             }
 
             // We convert the SearchResult structs to a string.
-            string stringResult = SearchResultToString(results);
+            string stringResult = SearchResultsToString(results);
             // Then send it to the corresponding pipe for the parent.
             write(fd[1], stringResult.c_str(), stringResult.size());
             close(fd[1]);
