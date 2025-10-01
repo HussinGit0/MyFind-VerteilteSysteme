@@ -1,6 +1,6 @@
 /**
  * By: Abo Shaar Hussin, Rosenmayr Alexander.
- * compile: go to build directory, use cmake .. then cmake --build .   .
+ * compile: create a build directory, use "cmake .." then "cmake --build ."
  * run: Go to /build and use the command: ./MyFind [/path] [file1] [file2] [file3] [options]
  * Options:
  *  -R: Recursive searching
