@@ -3,13 +3,12 @@
 
 #include <string>
 #include <sys/types.h>
-using std::string;
 
 struct SearchResult
 {
     pid_t pid;
-    string filename;
-    string path;
+    std::string filename;
+    std::string path;
 };
 
 #endif
