@@ -13,8 +13,6 @@
 #include <stdexcept>
 #include "Options.h"
 #include "SearchResult.h"
-
-#include <algorithm>
 #include <cctype>
 
 using namespace std;
