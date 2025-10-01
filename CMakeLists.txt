@@ -10,7 +10,11 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(MyFind src/main.cpp
     src/Options.cpp
+<<<<<<< HEAD
+    src/SearchResult.cpp)
+=======
     src/SearchResult.cpp)
 
 
 
+>>>>>>> 0a7f44fa505b9dac31b67e5f0c8fd6ce9daae331
