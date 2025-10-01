@@ -34,15 +34,15 @@ Options parseOptions(int argc, char *argv[])
     {
         switch (c)
         {
-            case 'R':
-                options.Counter_Option_R++;
-                break;
-            case 'i':
-                options.Counter_Option_i++;
-                break;
-            default:
-                throw invalid_argument("Invalid arguments provided.");
-                break;
+        case 'R':
+            options.Counter_Option_R++;
+            break;
+        case 'i':
+            options.Counter_Option_i++;
+            break;
+        default:
+            throw invalid_argument("Invalid arguments provided.");
+            break;
         }
     }
 
@@ -100,7 +100,7 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
     if (options.Counter_Option_R == 1)
     {
         // Iterate through entries recusively.
-        for (const auto &entry: recursive_directory_iterator(path))
+        for (const auto &entry : recursive_directory_iterator(path))
         {
             // Check if current entry is a file, and if its name matches the file we are searching for.
             if (entry.is_regular_file() &&
@@ -108,13 +108,14 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
             {
                 // Save the aggregate result in the results vector:
                 // https://en.cppreference.com/w/cpp/language/aggregate_initialization.html
-                results.push_back({pid, filename, entry.path()});
+                results.push_back({pid, entry.path().filename(), entry.path()});
             }
         }
-    } else
+    }
+    else
     {
         // Iterate without recursion.
-        for (const auto &entry: directory_iterator(path))
+        for (const auto &entry : directory_iterator(path))
         {
             if (entry.is_regular_file() &&
                 AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
@@ -135,7 +136,7 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
 string SearchResultToString(const vector<SearchResult> &results)
 {
     string output;
-    for (const auto &result: results)
+    for (const auto &result : results)
     {
         output += to_string(result.pid) + ": " + result.filename + ": " + result.path + "\n";
     }
@@ -149,7 +150,8 @@ int main(int argc, char *argv[])
     {
         // This stores the options which the user inputted for recursive or case insensetivity.
         options = parseOptions(argc, argv);
-    } catch (const invalid_argument &e)
+    }
+    catch (const invalid_argument &e)
     {
         cout << "Error: " << e.what() << endl;
         return 1;
@@ -192,7 +194,7 @@ int main(int argc, char *argv[])
     // Vector to store all child processes.
     vector<pid_t> children;
 
-    for (const auto &filename: filenames)
+    for (const auto &filename : filenames)
     {
         int fd[2]; // fd[0] reading operations, fd[1] writing operations
         if (pipe(fd) == -1)
@@ -214,18 +216,20 @@ int main(int argc, char *argv[])
             close(fd[1]); // Close the write operations because the parent doesn't need it.
             pipes_read.push_back(fd[0]);
             children.push_back(c_pid);
-        } else // This is a child process
+        }
+        else // This is a child process
         {
             close(fd[0]); // Close the read operations because the children don't need it.
             vector<SearchResult> results;
             try
             {
                 results = SearchFile(searchPath, filename, options);
-            } catch (filesystem_error &e)
+            }
+            catch (filesystem_error &e)
             {
                 cout << "Filesystem error while searching for '" << filename
-                        << "' in path '" << searchPath << "' :"
-                        << e.what() << "\n";
+                     << "' in path '" << searchPath << "' :"
+                     << e.what() << "\n";
                 return 1;
             }
 
@@ -240,7 +244,7 @@ int main(int argc, char *argv[])
 
     // Parent reads from all pipes
     char buffer[4096];
-    for (int fd: pipes_read)
+    for (int fd : pipes_read)
     {
         ssize_t n;
         while ((n = read(fd, buffer, sizeof(buffer) - 1)) > 0)
