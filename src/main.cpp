@@ -1,9 +1,12 @@
 /**
- * getopt: (https://stackoverflow.com/questions/52467531/using-getopt-in-c-to-handle-arguments)
- * compile: g++ main.cpp -o myfind
- * run: Go to /build and use the command: ./MyFind -i -R /path/to/dir file1 file2 file3
- * ./MyFind -i -R ~/projects file1 file2 file3
+ * By: Abo Shaar Hussin, Rosenmayr Alexander.
+ * compile: go to build directory, use cmake .. then cmake --build .   .
+ * run: Go to /build and use the command: ./MyFind [/path] [file1] [file2] [file3] [options]
+ * Options:
+ *  -R: Recursive searching
+ *  -i: Case insensetive
  **/
+
 #include <iostream>
 #include <string>
 #include <unistd.h>
@@ -17,13 +20,12 @@
 #include <cctype>
 
 using namespace std;
+using namespace filesystem;
 
 /// @brief Parses command line options.
 /// @param argc
 /// @param argv
-/// @param Counter_Option_R recursive flag
-/// @param Counter_Option_i case insensitive flag
-/// @return
+/// @return Struct of type Options.
 Options parseOptions(int argc, char *argv[])
 {
     struct Options options;
@@ -53,9 +55,14 @@ Options parseOptions(int argc, char *argv[])
     return options;
 }
 
-bool AreFileNamesEqual(const filesystem::path &file1, string file2, bool isCaseInsensetive)
+/// @brief Takes a file path's name and compares it with a string.
+/// @param file1 A path to the first file.
+/// @param file2 A string of the name.
+/// @param isCaseInsensetive Whether cases should be accounted for.
+/// @return A boolean indicating whether the file names are equal.
+bool AreFileNamesEqual(const path &file1path, string file2, bool isCaseInsensetive)
 {
-    string f1 = file1.string();
+    string f1 = file1path.string();
     string f2 = file2;
 
     if (!isCaseInsensetive)
@@ -63,9 +70,10 @@ bool AreFileNamesEqual(const filesystem::path &file1, string file2, bool isCaseI
         return f1 == f2;
     }
 
-    // https://www.geeksforgeeks.org/cpp/transform-c-stl-perform-operation-elements/
+    // Lambda functions: https://www.w3schools.com/cpp/cpp_functions_lambda.asp
     auto toLower = [](const string &s)
     {
+        // Transform: https://www.geeksforgeeks.org/cpp/transform-c-stl-perform-operation-elements/
         string result = s;
         transform(result.begin(), result.end(), result.begin(),
                   [](unsigned char c)
@@ -76,45 +84,53 @@ bool AreFileNamesEqual(const filesystem::path &file1, string file2, bool isCaseI
     return toLower(f1) == toLower(f2);
 }
 
+/// @brief Searches for a file in a directory.
+/// @param path Directory to search in.
+/// @param filename The file name to look for.
+/// @param options Options struct containing user option inputs.
+/// @return A vectory containing the SearchResult struct.
 vector<SearchResult> SearchFile(string &path, string filename, Options options)
 {
     vector<SearchResult> results;
     pid_t pid = getpid();
     bool isCaseInsensetive = options.Counter_Option_i;
 
-    try
+    if (options.Counter_Option_R == 1)
     {
-        if (options.Counter_Option_R == 1)
+        // Iterate through entries recusively.
+        for (const auto &entry : recursive_directory_iterator(path))
         {
-            for (const auto &entry : filesystem::recursive_directory_iterator(path))
+            // Check if current entry is a file, and if its name matches the file we are searching for.
+            if (entry.is_regular_file() &&
+                AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
             {
-                if (entry.is_regular_file() &&
-                    AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
-                {
-                    results.push_back({pid, filename, entry.path()});
-                }
-            }
-        }
-        else
-        {
-            for (const auto &entry : filesystem::directory_iterator(path))
-            {
-                if (entry.is_regular_file() &&
-                    AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
-                {
-                    results.push_back({pid, filename, entry.path()});
-                }
+                // Save the aggregate result in the results vector:
+                // https://en.cppreference.com/w/cpp/language/aggregate_initialization.html
+                results.push_back({pid, filename, entry.path()});
             }
         }
     }
-    catch (const filesystem::filesystem_error &e)
+    else
     {
-        cout << "Oops!";
+        // Iterate without recursion.
+        for (const auto &entry : directory_iterator(path))
+        {
+            if (entry.is_regular_file() &&
+                AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
+            {
+                // Save the aggregate result in the results vector:
+                // https://en.cppreference.com/w/cpp/language/aggregate_initialization.html
+                results.push_back({pid, filename, entry.path()});
+            }
+        }
     }
 
     return results;
 }
 
+/// @brief Covnerts a search results.
+/// @param results
+/// @return
 string SearchResultToString(const vector<SearchResult> &results)
 {
     string output;
@@ -130,17 +146,18 @@ int main(int argc, char *argv[])
     Options options;
     try
     {
+        // This stores the options which the user inputted for recursive or case insensetivity.
         options = parseOptions(argc, argv);
     }
     catch (const invalid_argument &e)
     {
-        cout << "Error: " << e.what() << endl;
+        cerr << "Error: " << e.what() << endl;
         return 1;
     }
 
     if (optind >= argc)
     {
-        cout << "Error: No input file provided." << endl;
+        cerr << "Error: No input directory provided." << endl;
         return 1;
     }
 
@@ -148,20 +165,21 @@ int main(int argc, char *argv[])
     string searchPath = argv[optind];
 
     optind++;
-    // If no file names are provided, return error
+    // If no file names are provided, return error because there is nothing to search for.
     if (optind >= argc)
     {
-        cout << "Error: at least one filename is required!\n";
+        cerr << "Error: at least one filename is required!\n";
         return 1;
     }
 
+    // Store all file inputs in one vector for easy access.
     vector<string> filenames;
     for (int i = optind; i < argc; i++)
     {
         filenames.push_back(argv[i]);
     }
 
-    // Testing directory reading:
+    // Testing directory reading (Taken from printaccesstest.c from the course):
     DIR *dirp;
     if ((dirp = opendir(searchPath.c_str())) == NULL)
     {
@@ -169,7 +187,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Vector to store all pipes.
     vector<int> pipes_read;
+    // Vector to store all child processes.
     vector<pid_t> children;
 
     for (const auto &filename : filenames)
@@ -189,28 +209,31 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-        // Parent process
-        if (c_pid > 0)
+        if (c_pid > 0) // Parent process
         {
-            close(fd[1]);
+            close(fd[1]); // Close the write operations because the parent doesn't need it.
             pipes_read.push_back(fd[0]);
             children.push_back(c_pid);
         }
-        else
+        else // This is a child process
         {
-            close(fd[0]);
+            close(fd[0]); // Close the read operations because the children don't need it.
             vector<SearchResult> results;
             try
             {
                 results = SearchFile(searchPath, filename, options);
             }
-            catch (filesystem::filesystem_error &e)
+            catch (filesystem_error &e)
             {
-                cout << "Oops";
+                cout << "Filesystem error while searching for '" << filename
+                     << "' in path '" << searchPath << "' :"
+                     << e.what() << "\n";
                 return 1;
             }
 
+            // We convert the SearchResult structs to a string.
             string stringResult = SearchResultToString(results);
+            // Then send it to the corresponding pipe for the parent.
             write(fd[1], stringResult.c_str(), stringResult.size());
             close(fd[1]);
             _exit(0);
@@ -227,6 +250,6 @@ int main(int argc, char *argv[])
             buffer[n] = '\0';
             cout << buffer;
         }
-        close(fd);
+        close(fd); // Close the pipe after reading.
     }
 }
