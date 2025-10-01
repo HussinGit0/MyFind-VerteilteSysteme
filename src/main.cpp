@@ -14,10 +14,10 @@
 #include "Options.h"
 #include "SearchResult.h"
 
-using namespace std;
+#include <algorithm>
+#include <cctype>
 
-// unsigned short Counter_Option_R = 0;
-// unsigned short Counter_Option_i = 0;
+using namespace std;
 
 /// @brief Parses command line options.
 /// @param argc
@@ -54,10 +54,34 @@ Options parseOptions(int argc, char *argv[])
     return options;
 }
 
+bool AreFileNamesEqual(const filesystem::path &file1, string file2, bool isCaseInsensetive)
+{
+    string f1 = file1.string();
+    string f2 = file2;
+
+    if (!isCaseInsensetive)
+    {
+        return f1 == f2;
+    }
+
+    // https://www.geeksforgeeks.org/cpp/transform-c-stl-perform-operation-elements/
+    auto toLower = [](const string &s)
+    {
+        string result = s;
+        transform(result.begin(), result.end(), result.begin(),
+                  [](unsigned char c)
+                  { return tolower(c); });
+        return result;
+    };
+
+    return toLower(f1) == toLower(f2);
+}
+
 vector<SearchResult> SearchFile(string &path, string filename, Options options)
 {
     vector<SearchResult> results;
     pid_t pid = getpid();
+    bool isCaseInsensetive = options.Counter_Option_i;
 
     try
     {
@@ -66,14 +90,10 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
             cout << "Recursive \n";
             for (const auto &entry : filesystem::recursive_directory_iterator(path))
             {
-                if (entry.is_regular_file() && entry.path().filename() == filename)
+                if (entry.is_regular_file() &&
+                    AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
                 {
-                    SearchResult result;
-                    result.pid = pid;
-                    result.filename = filename;
-                    result.path = entry.path();
-
-                    results.push_back(result);
+                    results.push_back({pid, filename, entry.path()});
                 }
             }
         }
@@ -81,14 +101,10 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
         {
             for (const auto &entry : filesystem::directory_iterator(path))
             {
-                if (entry.is_regular_file() && entry.path().filename() == filename)
+                if (entry.is_regular_file() &&
+                    AreFileNamesEqual(entry.path().filename(), filename, isCaseInsensetive))
                 {
-                    SearchResult result;
-                    result.pid = pid;
-                    result.filename = filename;
-                    result.path = entry.path();
-
-                    results.push_back(result);
+                    results.push_back({pid, filename, entry.path()});
                 }
             }
         }
@@ -99,6 +115,16 @@ vector<SearchResult> SearchFile(string &path, string filename, Options options)
     }
 
     return results;
+}
+
+string SearchResultToString(const vector<SearchResult> &results)
+{
+    string output;
+    for (const auto &result : results)
+    {
+        output += to_string(result.pid) + ": " + result.filename + ": " + result.path + "\n";
+    }
+    return output;
 }
 
 int main(int argc, char *argv[])
@@ -145,24 +171,64 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /// SEARCH
-    vector<SearchResult> results;
-    try
+    vector<int> pipes_read;
+    vector<pid_t> children;
+
+    for (const auto &filename : filenames)
     {
-        results = SearchFile(searchPath, filenames[0], options);
-    }
-    catch (filesystem::filesystem_error &e)
-    {
-        cout << "Oops";
-        return 1;
+        int fd[2]; // fd[0] reading operations, fd[1] writing operations
+        if (pipe(fd) == -1)
+        {
+            cout << "Error piping";
+            return 1;
+        }
+
+        // https://www.geeksforgeeks.org/cpp/create-processes-with-fork-in-cpp/
+        pid_t c_pid = fork();
+        if (c_pid == -1)
+        {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+
+        // Parent process
+        if (c_pid > 0)
+        {
+            close(fd[1]);
+            pipes_read.push_back(fd[0]);
+            children.push_back(c_pid);
+        }
+        else
+        {
+            close(fd[0]);
+            vector<SearchResult> results;
+            try
+            {
+                results = SearchFile(searchPath, filename, options);
+            }
+            catch (filesystem::filesystem_error &e)
+            {
+                cout << "Oops";
+                return 1;
+            }
+
+            string stringResult = SearchResultToString(results);
+            write(fd[1], stringResult.c_str(), stringResult.size());
+            close(fd[1]);
+            _exit(0);
+        }
     }
 
-    /// OUTPUT SEARCH
-    for (const auto &result : results)
+    // Parent reads from all pipes
+    char buffer[4096];
+    for (int fd : pipes_read)
     {
-        cout << "pid: " << result.pid << " . file name: " << result.filename << " . path: " << result.path << "\n";
+        ssize_t n;
+        while ((n = read(fd, buffer, sizeof(buffer) - 1)) > 0)
+        {
+            buffer[n] = '\0';
+            cout << buffer;
+        }
+        close(fd);
     }
-
-    cout << "terminating program.\n";
-    return 0;
 }
