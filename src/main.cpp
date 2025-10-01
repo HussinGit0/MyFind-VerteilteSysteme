@@ -191,8 +191,6 @@ int main(int argc, char *argv[])
 
     // Vector to store all pipes.
     vector<int> pipes_read;
-    // Vector to store all child processes.
-    vector<pid_t> children;
 
     for (const auto &filename : filenames)
     {
@@ -213,9 +211,8 @@ int main(int argc, char *argv[])
 
         if (c_pid > 0) // Parent process
         {
-            close(fd[1]); // Close the write operations because the parent doesn't need it.
-            pipes_read.push_back(fd[0]);
-            children.push_back(c_pid);
+            close(fd[1]);                // Close the write operations because the parent doesn't need it.
+            pipes_read.push_back(fd[0]); // Store the read pipe.
         }
         else // This is a child process
         {
@@ -244,14 +241,22 @@ int main(int argc, char *argv[])
 
     // Parent reads from all pipes
     char buffer[4096];
+    vector<string> outputs; // Store outputs to display them at once later (Synchronization).
     for (int fd : pipes_read)
     {
         ssize_t n;
+        string out;
         while ((n = read(fd, buffer, sizeof(buffer) - 1)) > 0)
         {
             buffer[n] = '\0';
-            cout << buffer;
+            outputs.push_back(string(buffer));
         }
         close(fd); // Close the pipe after reading.
+    }
+
+    // Write outputs at once.
+    for (string output : outputs)
+    {
+        cout << output;
     }
 }
